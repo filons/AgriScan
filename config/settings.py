@@ -31,6 +31,12 @@ DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.onrender.com',
+    'http://localhost',
+    'http://127.0.0.1',
+]
+
 
 # Application definition
 
@@ -124,9 +130,10 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
+WHITENOISE_USE_FINDERS = True
 
 
 # Email
@@ -141,6 +148,7 @@ MAILERS = {
 # Fichiers médias : stockage temporaire des photos envoyées
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+(MEDIA_ROOT / "uploads").mkdir(parents=True, exist_ok=True)
 
 # Modèle d'IA et limites d'envoi
 MODELE_PATH = BASE_DIR / "modele_fertilite_sol.h5"
