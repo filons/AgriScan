@@ -47,6 +47,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   font-size: 16px;
 }
 
@@ -116,6 +117,7 @@ body {
 .brand-accent {
   background: linear-gradient(135deg, var(--primary) 0%, #10b981 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -275,6 +277,7 @@ body {
   align-items: center;
   gap: 0.4rem;
   background: rgba(15, 23, 42, 0.85);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
