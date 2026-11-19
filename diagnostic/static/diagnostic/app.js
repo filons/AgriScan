@@ -4,46 +4,64 @@
   const form = document.getElementById("form-scan");
   const inCamera = document.getElementById("photo_camera");
   const inGalerie = document.getElementById("photo_galerie");
-  const zone = document.getElementById("zone");
+  const dropzone = document.getElementById("dropzone");
   const zoneContenu = document.getElementById("zone-contenu");
+  const previewWrapper = document.getElementById("preview-wrapper");
   const apercu = document.getElementById("apercu-local");
+  const btnReinit = document.getElementById("btn-reinit");
+  const fileStatus = document.getElementById("file-status");
   const nomEl = document.getElementById("nom-fichier");
   const erreurEl = document.getElementById("message-erreur");
   const btn = document.getElementById("btn-analyser");
   const btnTxt = btn.querySelector(".txt");
 
   const FORMATS_OK = ["image/jpeg", "image/png"];
-  const COTE_MAX = 1280;          // réduction avant envoi (économie de données)
+  const COTE_MAX = 1280;          // réduction avant envoi (économie de données mobile)
   const SEUIL_REDUCTION = 1.5 * 1024 * 1024;
-  const TEXTE_BTN = btnTxt.textContent;
+  const TEXTE_BTN_INITIAL = btnTxt.textContent;
 
   let urlApercu = null;
-  let traitement = Promise.resolve();   // réduction en cours
+  let traitement = Promise.resolve();
 
   function montrerErreur(msg) {
-    erreurEl.textContent = msg;
-    erreurEl.hidden = false;
+    if (erreurEl) {
+      const span = erreurEl.querySelector("span") || erreurEl;
+      span.textContent = msg;
+      erreurEl.hidden = false;
+    }
   }
+
   function cacherErreur() {
-    erreurEl.hidden = true;
-    erreurEl.textContent = "";
+    if (erreurEl) {
+      erreurEl.hidden = true;
+    }
   }
 
   function reinitialiser() {
-    if (urlApercu) { URL.revokeObjectURL(urlApercu); urlApercu = null; }
-    apercu.hidden = true;
-    apercu.removeAttribute("src");
-    zoneContenu.hidden = false;
-    zone.classList.remove("avec-photo");
-    nomEl.textContent = "Aucune photo choisie";
-    nomEl.classList.remove("ok");
+    if (urlApercu) {
+      URL.revokeObjectURL(urlApercu);
+      urlApercu = null;
+    }
+    if (inCamera) inCamera.value = "";
+    if (inGalerie) inGalerie.value = "";
+    
+    if (apercu) {
+      apercu.removeAttribute("src");
+    }
+    if (previewWrapper) previewWrapper.hidden = true;
+    if (zoneContenu) zoneContenu.hidden = false;
+    if (dropzone) dropzone.classList.remove("has-photo");
+    if (fileStatus) fileStatus.hidden = true;
   }
 
   async function reduire(fichier) {
     if (!window.createImageBitmap) return null;
     const bmp = await createImageBitmap(fichier, { imageOrientation: "from-image" });
     const echelle = Math.min(1, COTE_MAX / Math.max(bmp.width, bmp.height));
-    if (echelle === 1 && fichier.size < SEUIL_REDUCTION) { bmp.close(); return null; }
+    if (echelle === 1 && fichier.size < SEUIL_REDUCTION) {
+      bmp.close();
+      return null;
+    }
 
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(bmp.width * echelle);
@@ -53,73 +71,90 @@
 
     const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.9));
     if (!blob) return null;
-    const base = fichier.name.replace(/\.[^.]+$/, "") || "photo";
+    const base = fichier.name.replace(/\.[^.]+$/, "") || "photo_sol";
     return new File([blob], base + ".jpg", { type: "image/jpeg" });
   }
 
-  async function traiterChoix(input, autre) {
-    autre.value = "";               // une seule photo envoyée à la fois
+  async function traiterChoix(inputActif, autreInput) {
+    if (autreInput) autreInput.value = "";
     cacherErreur();
 
-    const fichier = input.files[0];
-    if (!fichier) { reinitialiser(); return; }
-
-    if (!FORMATS_OK.includes(fichier.type)) {
-      input.value = "";
+    const fichier = inputActif.files[0];
+    if (!fichier) {
       reinitialiser();
-      montrerErreur("Format non pris en charge. Choisissez une photo JPG ou PNG.");
       return;
     }
 
-    // Affichage immédiat : nom du fichier + aperçu
+    if (!FORMATS_OK.includes(fichier.type)) {
+      reinitialiser();
+      montrerErreur("Format non pris en charge. Veuillez choisir une photo JPG ou PNG.");
+      return;
+    }
+
+    // Afficher l'aperçu immédiatement
     if (urlApercu) URL.revokeObjectURL(urlApercu);
     urlApercu = URL.createObjectURL(fichier);
-    apercu.src = urlApercu;
-    apercu.hidden = false;
-    zoneContenu.hidden = true;
-    zone.classList.add("avec-photo");
-    nomEl.textContent = "📷 " + fichier.name;
-    nomEl.classList.add("ok");
+    
+    if (apercu) apercu.src = urlApercu;
+    if (zoneContenu) zoneContenu.hidden = true;
+    if (previewWrapper) previewWrapper.hidden = false;
+    if (dropzone) dropzone.classList.add("has-photo");
+    
+    if (fileStatus && nomEl) {
+      nomEl.textContent = fichier.name;
+      fileStatus.hidden = false;
+    }
 
-    // Réduction silencieuse ; en cas d'échec on envoie l'original
+    // Optimisation silencieuse en arrière-plan
     traitement = (async () => {
       try {
         const reduit = await reduire(fichier);
         if (reduit) {
           const dt = new DataTransfer();
           dt.items.add(reduit);
-          input.files = dt.files;
+          inputActif.files = dt.files;
         }
-      } catch (e) { /* on garde le fichier d'origine */ }
+      } catch (err) {
+        // En cas d'exception, on conserve le fichier d'origine
+      }
     })();
   }
 
-  inCamera.addEventListener("change", () => traiterChoix(inCamera, inGalerie));
-  inGalerie.addEventListener("change", () => traiterChoix(inGalerie, inCamera));
+  if (inCamera) inCamera.addEventListener("change", () => traiterChoix(inCamera, inGalerie));
+  if (inGalerie) inGalerie.addEventListener("change", () => traiterChoix(inGalerie, inCamera));
+  if (btnReinit) btnReinit.addEventListener("click", reinitialiser);
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const fichier = inCamera.files[0] || inGalerie.files[0];
-    if (!fichier) {
-      montrerErreur("Veuillez prendre ou choisir une photo du sol avant de lancer l'analyse.");
-      zone.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-    cacherErreur();
-    btn.disabled = true;
-    btn.classList.add("charge");
-    btnTxt.textContent = "Analyse en cours…";
-    traitement.then(() => form.submit());
-  });
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const fichier = (inCamera && inCamera.files[0]) || (inGalerie && inGalerie.files[0]);
+      if (!fichier) {
+        montrerErreur("Veuillez prendre ou sélectionner une photo du sol avant de lancer l'analyse.");
+        dropzone.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      
+      cacherErreur();
+      btn.disabled = true;
+      btn.classList.add("loading");
+      btnTxt.textContent = "Analyse IA en cours…";
 
-  // Retour arrière du navigateur : on remet le bouton à l'état normal
+      traitement.then(() => form.submit());
+    });
+  }
+
+  // Restauration de l'état si retour navigateur
   window.addEventListener("pageshow", () => {
-    btn.disabled = false;
-    btn.classList.remove("charge");
-    btnTxt.textContent = TEXTE_BTN;
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove("loading");
+      btnTxt.textContent = TEXTE_BTN_INITIAL;
+    }
   });
 
-  // Après une analyse, on amène le résultat à l'écran
+  // Scroll automatique et fluide vers le résultat
   const resultat = document.getElementById("resultat");
-  if (resultat) resultat.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (resultat) {
+    resultat.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 })();
