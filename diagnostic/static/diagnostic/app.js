@@ -152,6 +152,15 @@
     }
   });
 
+  // Barre de progression du résultat
+  const progressBar = document.querySelector(".progress-bar");
+  if (progressBar && progressBar.dataset.confiance) {
+    // Petit délai pour une animation fluide à l'arrivée
+    setTimeout(() => {
+      progressBar.style.width = progressBar.dataset.confiance + "%";
+    }, 150);
+  }
+
   // Scroll automatique et fluide vers le résultat
   const resultat = document.getElementById("resultat");
   if (resultat) {
